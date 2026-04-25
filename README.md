@@ -2,6 +2,10 @@
 
 Scraper for **GeM Portal** (`bidplus.gem.gov.in/all-bids`) — India's central government procurement marketplace.
 
+# Scraper Output:
+
+![Scraper Output](Screenshot%202026-04-25%20at%209.00.06%E2%80%AFPM.png)
+
 ## What it does
 
 - Scrapes active government tender/bid listings across multiple pages
