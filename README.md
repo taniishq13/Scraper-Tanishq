@@ -28,7 +28,7 @@ Scraper for **GeM Portal** (`bidplus.gem.gov.in/all-bids`) — India's central g
 
 ```bash
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 

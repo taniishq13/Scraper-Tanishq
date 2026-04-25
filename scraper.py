@@ -1,6 +1,3 @@
-# scraper.py
-# Drives the browser, handles pagination, and calls the parser.
-
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -41,14 +38,13 @@ def build_driver():
     service = Service("/usr/local/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=options)
 
-    # Make automation harder to detect
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
     return driver
 
 
 def wait_for_bids(driver, timeout=PAGE_LOAD_TIMEOUT):
-    wait(3)  # let JS render first
+    wait(3)
     WebDriverWait(driver, timeout).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "div.block_header"))
     )
@@ -80,27 +76,22 @@ def go_to_next_page(driver):
         return False
 
 
-def fetch_detail(driver, url):
-    """
-    Open a tender's detail page and return its HTML.
-    Returns None if the page fails to load.
-    """
+def fetch_detail(driver, url, retries=3):
     if not url:
         return None
-    try:
-        driver.get(url)
-        wait(DELAY_BETWEEN_DETAILS)
-        return driver.page_source
-    except Exception as e:
-        log.warning(f"Could not load detail page {url}: {e}")
-        return None
+    for attempt in range(retries):
+        try:
+            driver.get(url)
+            wait(DELAY_BETWEEN_DETAILS)
+            return driver.page_source
+        except Exception as e:
+            log.warning(f"Attempt {attempt+1} failed for {url}: {e}")
+            wait(2)
+    log.warning(f"All {retries} attempts failed for {url}, skipping.")
+    return None
 
 
 def run_scraper():
-    """
-    Main function. Opens the browser, loops through pages,
-    extracts listing data + detail page data, returns all tenders.
-    """
     log.info("Starting scraper...")
     driver = build_driver()
     all_tenders = []
@@ -115,28 +106,26 @@ def run_scraper():
             try:
                 wait_for_bids(driver)
             except TimeoutException:
-                log.warning(f"Page {page_num} timed out waiting for bid cards. Skipping.")
+                log.warning(f"Page {page_num} timed out. Skipping.")
                 break
 
-            # Parse the listing page
+            current_page_url = driver.current_url
+
             page_html = driver.page_source
             tenders = parse_listing_page(page_html)
 
-            # Visit each tender's detail page for extra fields
             for tender in tenders:
                 if tender.get("detail_url"):
                     detail_html = fetch_detail(driver, tender["detail_url"])
                     if detail_html:
                         extra = parse_detail_page(detail_html, tender.get("bid_number", "?"))
                         tender.update(extra)
-                    # Go back to listing after visiting detail
-                    driver.back()
-                    wait(1)
+                    driver.get(current_page_url)
+                    wait(2)
 
             all_tenders.extend(tenders)
             log.info(f"Total tenders collected so far: {len(all_tenders)}")
 
-            # Move to next page (stop if we're at the end)
             if page_num < PAGES_TO_SCRAPE:
                 moved = go_to_next_page(driver)
                 if not moved:

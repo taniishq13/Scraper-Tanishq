@@ -1,6 +1,3 @@
-# parser.py
-# HTML parsing using the exact class names from bidplus.gem.gov.in/all-bids
-
 from bs4 import BeautifulSoup
 from utils import clean, log
 
@@ -13,7 +10,6 @@ def parse_listing_page(html):
     soup = BeautifulSoup(html, "lxml")
     tenders = []
 
-    # Each bid is wrapped in a parent div containing div.block_header + div.card-body
     cards = soup.select("div.block_header")
 
     if not cards:
@@ -21,7 +17,7 @@ def parse_listing_page(html):
         return tenders
 
     for header in cards:
-        card = header.parent  # full card = parent of block_header
+        card = header.parent
         tender = extract_card_fields(header, card)
         if tender:
             tenders.append(tender)
@@ -38,7 +34,6 @@ def extract_card_fields(header, card):
     """
     tender = {}
 
-    # Bid number + detail URL
     try:
         bid_link = header.select_one("a.bid_no_hover")
         if bid_link:
@@ -56,7 +51,6 @@ def extract_card_fields(header, card):
         tender["bid_number"] = None
         tender["detail_url"] = None
 
-    # Item name — full name is in data-content, visible text is truncated
     try:
         item_el = card.select_one("a[data-toggle='popover']")
         if item_el:
@@ -68,7 +62,6 @@ def extract_card_fields(header, card):
     except Exception:
         tender["item_name"] = None
 
-    # Quantity
     try:
         tender["quantity"] = None
         for row in card.select("div.row"):
@@ -80,7 +73,6 @@ def extract_card_fields(header, card):
     except Exception:
         tender["quantity"] = None
 
-    # Organization / Department name
     try:
         tender["organization"] = None
         for row in card.select("div.row"):
@@ -92,23 +84,27 @@ def extract_card_fields(header, card):
     except Exception:
         tender["organization"] = None
 
-    # Start date
     try:
         start_el = card.select_one("span.start_date")
         tender["start_date"] = clean(start_el.get_text()) if start_el else None
     except Exception:
         tender["start_date"] = None
 
-    # End date
     try:
         end_el = card.select_one("span.end_date")
         tender["end_date"] = clean(end_el.get_text()) if end_el else None
     except Exception:
         tender["end_date"] = None
 
-    # Skip cards with no useful data (layout divs etc.)
     if not any([tender.get("bid_number"), tender.get("item_name")]):
         return None
+    
+    tender["start_date"] = normalize_date(tender.get("start_date"))
+    tender["end_date"] = normalize_date(tender.get("end_date"))
+    tender["quantity"] = fill_missing(tender.get("quantity"))
+    tender["organization"] = fill_missing(tender.get("organization"))
+    tender["category"] = fill_missing(tender.get("category"))
+    tender["item_name"] = fill_missing(tender.get("item_name"))
 
     return tender
 
@@ -120,7 +116,6 @@ def parse_detail_page(html, bid_number):
     soup = BeautifulSoup(html, "lxml")
     extra = {}
 
-    # Estimated / bid value
     try:
         for row in soup.select("div.row, tr"):
             text = row.get_text()
@@ -132,7 +127,6 @@ def parse_detail_page(html, bid_number):
     except Exception:
         pass
 
-    # Consignee state / delivery location
     try:
         for row in soup.select("div.row, tr"):
             text = row.get_text()
