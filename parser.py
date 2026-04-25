@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 from utils import clean, log
+from utils import clean, log, fill_missing, normalize_date
 
 
 def parse_listing_page(html):
